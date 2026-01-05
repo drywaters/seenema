@@ -255,19 +255,19 @@
 		position: absolute;
 		top: 0.5rem;
 		left: 0.5rem;
-		background: var(--color-gold);
-		color: var(--color-theater-black);
-		width: 2rem;
-		height: 2rem;
-		border-radius: 50%;
-		display: flex;
+		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+		min-width: 2rem;
+		height: 2rem;
+		padding: 0 0.5rem;
+		border-radius: 6px;
 		font-family: var(--font-display);
+		font-weight: 600;
 		font-size: 0.875rem;
-		font-weight: 700;
-		border: 2px solid var(--color-theater-black);
-		box-shadow: var(--shadow-md);
+		background: rgba(217, 119, 6, 0.15);
+		border: 1px solid var(--color-gold);
+		color: var(--color-gold);
 		z-index: 10;
 	}
 

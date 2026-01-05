@@ -37,7 +37,7 @@ templ PosterCard(entry *model.Entry, showRatings bool) {
 
 		if entry.PickedByPerson != nil {
 			<div class="picker-badge" title={ "Picked by " + entry.PickedByPerson.Name }>
-				{ entry.PickedByPerson.Initial }
+				{ entry.PickedByPerson.Name }
 			</div>
 		}
 
