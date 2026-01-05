@@ -84,9 +84,9 @@ func (h *DashboardHandler) getDashboardData(ctx context.Context) ([]pages.GroupD
 		})
 	}
 
-	// Sort groups by number of entries (descending), so larger groups appear first
+	// Sort groups by group number (descending), so higher group numbers appear first
 	sort.Slice(groupDataList, func(i, j int) bool {
-		return len(groupDataList[i].Entries) > len(groupDataList[j].Entries)
+		return groupDataList[i].Number > groupDataList[j].Number
 	})
 
 	return groupDataList, persons, currentGroup, nil
