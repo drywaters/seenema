@@ -56,6 +56,13 @@ func (h *EntryHandler) Update(w http.ResponseWriter, r *http.Request) {
 		input.Notes = &notes
 	}
 
+	if pickedByStr := r.FormValue("picked_by_person_id"); pickedByStr != "" {
+		pickedByID, err := uuid.Parse(pickedByStr)
+		if err == nil {
+			input.PickedByPersonID = &pickedByID
+		}
+	}
+
 	err = h.entryRepo.Update(ctx, entryID, input)
 	if err != nil {
 		slog.Error("failed to update entry", "error", err)

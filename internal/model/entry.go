@@ -8,29 +8,33 @@ import (
 
 // Entry represents a movie entry in a watch group
 type Entry struct {
-	ID          uuid.UUID  `json:"id"`
-	MovieID     uuid.UUID  `json:"movie_id"`
-	GroupNumber int        `json:"group_number"`
-	WatchedAt   *time.Time `json:"watched_at,omitempty"` // nil = not yet watched
-	AddedAt     time.Time  `json:"added_at"`
-	Notes       *string    `json:"notes,omitempty"`
+	ID                uuid.UUID  `json:"id"`
+	MovieID           uuid.UUID  `json:"movie_id"`
+	GroupNumber       int        `json:"group_number"`
+	WatchedAt         *time.Time `json:"watched_at,omitempty"` // nil = not yet watched
+	AddedAt           time.Time  `json:"added_at"`
+	Notes             *string    `json:"notes,omitempty"`
+	PickedByPersonID  *uuid.UUID `json:"picked_by_person_id,omitempty"`
 
 	// Joined data (populated by repository)
-	Movie   *Movie    `json:"movie,omitempty"`
-	Ratings []*Rating `json:"ratings,omitempty"`
+	Movie          *Movie    `json:"movie,omitempty"`
+	Ratings        []*Rating `json:"ratings,omitempty"`
+	PickedByPerson *Person   `json:"picked_by_person,omitempty"`
 }
 
 // CreateEntryInput represents the input for creating an entry
 type CreateEntryInput struct {
-	MovieID     uuid.UUID `json:"movie_id"`
-	GroupNumber int       `json:"group_number"`
-	Notes       *string   `json:"notes,omitempty"`
+	MovieID          uuid.UUID  `json:"movie_id"`
+	GroupNumber      int        `json:"group_number"`
+	Notes            *string    `json:"notes,omitempty"`
+	PickedByPersonID *uuid.UUID `json:"picked_by_person_id,omitempty"`
 }
 
 // UpdateEntryInput represents the input for updating an entry
 type UpdateEntryInput struct {
-	GroupNumber *int    `json:"group_number,omitempty"`
-	Notes       *string `json:"notes,omitempty"`
+	GroupNumber      *int       `json:"group_number,omitempty"`
+	Notes            *string    `json:"notes,omitempty"`
+	PickedByPersonID *uuid.UUID `json:"picked_by_person_id,omitempty"`
 }
 
 // IsWatched returns true if the entry has been watched

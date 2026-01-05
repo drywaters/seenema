@@ -34,7 +34,13 @@ templ PosterCard(entry *model.Entry, showRatings bool) {
 				Watched
 			</div>
 		}
-		
+
+		if entry.PickedByPerson != nil {
+			<div class="picker-badge" title={ "Picked by " + entry.PickedByPerson.Name }>
+				{ entry.PickedByPerson.Initial }
+			</div>
+		}
+
 		@Poster(entry.Movie, "w-full")
 		
 		<div class="poster-overlay">
