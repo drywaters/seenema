@@ -2,13 +2,14 @@ package components
 
 import (
 	"github.com/drywaters/seenema/internal/model"
+	"github.com/drywaters/seenema/internal/ui"
 	"github.com/google/uuid"
 )
 
 // RatingBadge renders a rating badge with appropriate color
 templ RatingBadge(score float64) {
 	<span class={ "rating-badge", model.ScoreColorClass(score) }>
-		{ formatFloat(score) }
+		{ ui.FormatFloat(score) }
 	</span>
 }
 
@@ -39,7 +40,7 @@ templ RatingInput(entryID uuid.UUID, person *model.Person, currentScore *float64
 				inputmode="decimal"
 				oninput="if (this.value === '') { return; } const v = parseFloat(this.value); if (!Number.isNaN(v)) { if (v > 10) this.value = '10'; if (v < 0) this.value = '0'; }"
 				if currentScore != nil {
-					value={ formatFloat(*currentScore) }
+					value={ ui.FormatFloat(*currentScore) }
 				}
 				placeholder="—"
 				class="rating-input"
@@ -67,10 +68,10 @@ templ AverageRating(avg *float64, ratingCount int) {
 		<span class="text-gold font-display text-sm uppercase tracking-wider">Average</span>
 		if avg != nil {
 			<span class={ "rating-badge text-lg", model.ScoreColorClass(*avg) }>
-				{ formatFloat(*avg) }
+				{ ui.FormatFloat(*avg) }
 			</span>
 			<span class="text-sm text-cream-ticket opacity-60">
-				({ intToStr(ratingCount) }/4 ratings)
+				({ ui.IntToStr(ratingCount) }/4 ratings)
 			</span>
 		} else {
 			<span class="rating-badge rating-empty text-lg">—</span>

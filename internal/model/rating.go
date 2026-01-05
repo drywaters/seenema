@@ -11,7 +11,7 @@ type Rating struct {
 	ID        uuid.UUID `json:"id"`
 	PersonID  uuid.UUID `json:"person_id"`
 	EntryID   uuid.UUID `json:"entry_id"`
-	Score     float64   `json:"score"` // 1.0 - 10.0
+	Score     float64   `json:"score"` // 0.0 - 10.0
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
@@ -47,4 +47,3 @@ func ScoreColorClass(score float64) string {
 	}
 	return "rating-high"
 }
-

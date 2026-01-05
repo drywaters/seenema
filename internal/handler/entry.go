@@ -56,7 +56,7 @@ func (h *EntryHandler) Update(w http.ResponseWriter, r *http.Request) {
 		input.Notes = &notes
 	}
 
-	_, err = h.entryRepo.Update(ctx, entryID, input)
+	err = h.entryRepo.Update(ctx, entryID, input)
 	if err != nil {
 		slog.Error("failed to update entry", "error", err)
 		http.Error(w, "Failed to update entry", http.StatusInternalServerError)
@@ -198,4 +198,3 @@ func (h *EntryHandler) GroupPartial(w http.ResponseWriter, r *http.Request) {
 
 	partials.GroupSection(groupNum, entries, persons).Render(ctx, w)
 }
-

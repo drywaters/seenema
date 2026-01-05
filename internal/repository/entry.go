@@ -99,6 +99,32 @@ func (r *EntryRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Ent
 	return entry, nil
 }
 
+// GetByMovieAndGroup retrieves an entry by movie ID and group number
+func (r *EntryRepository) GetByMovieAndGroup(ctx context.Context, movieID uuid.UUID, groupNumber int) (*model.Entry, error) {
+	query := `
+		SELECT id, movie_id, group_number, watched_at, added_at, notes
+		FROM entries
+		WHERE movie_id = $1 AND group_number = $2`
+
+	entry := &model.Entry{}
+	err := r.pool.QueryRow(ctx, query, movieID, groupNumber).Scan(
+		&entry.ID,
+		&entry.MovieID,
+		&entry.GroupNumber,
+		&entry.WatchedAt,
+		&entry.AddedAt,
+		&entry.Notes,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get entry by movie and group: %w", err)
+	}
+
+	return entry, nil
+}
+
 // getRatingsForEntry fetches all ratings for an entry with person information
 func (r *EntryRepository) getRatingsForEntry(ctx context.Context, entryID uuid.UUID) ([]*model.Rating, error) {
 	query := `
@@ -135,8 +161,58 @@ func (r *EntryRepository) getRatingsForEntry(ctx context.Context, entryID uuid.U
 		rating.Person = person
 		ratings = append(ratings, rating)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ratings rows: %w", err)
+	}
 
 	return ratings, nil
+}
+
+// getRatingsForEntries fetches all ratings for multiple entries with person information
+func (r *EntryRepository) getRatingsForEntries(ctx context.Context, entryIDs []uuid.UUID) (map[uuid.UUID][]*model.Rating, error) {
+	ratingsByEntry := make(map[uuid.UUID][]*model.Rating, len(entryIDs))
+	if len(entryIDs) == 0 {
+		return ratingsByEntry, nil
+	}
+
+	query := `
+		SELECT r.id, r.person_id, r.entry_id, r.score, r.created_at, r.updated_at,
+		       p.id, p.initial, p.name
+		FROM ratings r
+		JOIN persons p ON r.person_id = p.id
+		WHERE r.entry_id = ANY($1)
+		ORDER BY r.entry_id, p.initial`
+
+	rows, err := r.pool.Query(ctx, query, entryIDs)
+	if err != nil {
+		return nil, fmt.Errorf("get ratings for entries: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		rating := &model.Rating{}
+		person := &model.Person{}
+		if err := rows.Scan(
+			&rating.ID,
+			&rating.PersonID,
+			&rating.EntryID,
+			&rating.Score,
+			&rating.CreatedAt,
+			&rating.UpdatedAt,
+			&person.ID,
+			&person.Initial,
+			&person.Name,
+		); err != nil {
+			return nil, fmt.Errorf("scan rating: %w", err)
+		}
+		rating.Person = person
+		ratingsByEntry[rating.EntryID] = append(ratingsByEntry[rating.EntryID], rating)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ratings rows: %w", err)
+	}
+
+	return ratingsByEntry, nil
 }
 
 // ListByGroup retrieves all entries for a specific group with movie and ratings
@@ -183,14 +259,21 @@ func (r *EntryRepository) ListByGroup(ctx context.Context, groupNumber int) ([]*
 		entry.Movie = movie
 		entries = append(entries, entry)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list entries by group rows: %w", err)
+	}
 
-	// Fetch ratings for all entries
+	entryIDs := make([]uuid.UUID, 0, len(entries))
 	for _, entry := range entries {
-		ratings, err := r.getRatingsForEntry(ctx, entry.ID)
-		if err != nil {
-			return nil, err
-		}
-		entry.Ratings = ratings
+		entryIDs = append(entryIDs, entry.ID)
+	}
+
+	ratingsByEntry, err := r.getRatingsForEntries(ctx, entryIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range entries {
+		entry.Ratings = ratingsByEntry[entry.ID]
 	}
 
 	return entries, nil
@@ -214,6 +297,9 @@ func (r *EntryRepository) ListGroups(ctx context.Context) ([]int, error) {
 		}
 		groups = append(groups, group)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate groups rows: %w", err)
+	}
 
 	return groups, nil
 }
@@ -232,47 +318,18 @@ func (r *EntryRepository) GetCurrentGroup(ctx context.Context) (int, error) {
 }
 
 // Update updates an existing entry
-func (r *EntryRepository) Update(ctx context.Context, id uuid.UUID, input model.UpdateEntryInput) (*model.Entry, error) {
-	// Get current entry first
-	entry, err := r.GetByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if entry == nil {
-		return nil, nil
-	}
-
-	groupNumber := entry.GroupNumber
-	notes := entry.Notes
-
-	if input.GroupNumber != nil {
-		groupNumber = *input.GroupNumber
-	}
-	if input.Notes != nil {
-		notes = input.Notes
-	}
-
+func (r *EntryRepository) Update(ctx context.Context, id uuid.UUID, input model.UpdateEntryInput) error {
 	query := `
 		UPDATE entries
-		SET group_number = $2, notes = $3
-		WHERE id = $1
-		RETURNING id, movie_id, group_number, watched_at, added_at, notes`
+		SET group_number = COALESCE($2, group_number),
+		    notes = COALESCE($3, notes)
+		WHERE id = $1`
 
-	updated := &model.Entry{}
-	err = r.pool.QueryRow(ctx, query, id, groupNumber, notes).Scan(
-		&updated.ID,
-		&updated.MovieID,
-		&updated.GroupNumber,
-		&updated.WatchedAt,
-		&updated.AddedAt,
-		&updated.Notes,
-	)
+	_, err := r.pool.Exec(ctx, query, id, input.GroupNumber, input.Notes)
 	if err != nil {
-		return nil, fmt.Errorf("update entry: %w", err)
+		return fmt.Errorf("update entry: %w", err)
 	}
-
-	// Return full entry with movie and ratings
-	return r.GetByID(ctx, id)
+	return nil
 }
 
 // Delete removes an entry from the database
@@ -304,4 +361,3 @@ func (r *EntryRepository) ClearWatchedDate(ctx context.Context, id uuid.UUID) er
 	}
 	return nil
 }
-

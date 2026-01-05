@@ -2,9 +2,9 @@ package repository
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/drywaters/seenema/internal/model"
 	"github.com/google/uuid"
@@ -159,65 +159,58 @@ func (r *MovieRepository) List(ctx context.Context) ([]*model.Movie, error) {
 		}
 		movies = append(movies, movie)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration: %w", err)
+	}
 
 	return movies, nil
 }
 
 // Update updates an existing movie
 func (r *MovieRepository) Update(ctx context.Context, id uuid.UUID, input model.UpdateMovieInput) (*model.Movie, error) {
-	// Build the update query dynamically based on provided fields
-	movie, err := r.GetByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if movie == nil {
-		return nil, nil
-	}
-
+	setClauses := make([]string, 0, 7)
+	args := []any{id}
 	if input.Title != nil {
-		movie.Title = *input.Title
+		setClauses = append(setClauses, fmt.Sprintf("title = $%d", len(args)+1))
+		args = append(args, *input.Title)
 	}
 	if input.ReleaseYear != nil {
-		movie.ReleaseYear = input.ReleaseYear
+		setClauses = append(setClauses, fmt.Sprintf("release_year = $%d", len(args)+1))
+		args = append(args, *input.ReleaseYear)
 	}
 	if input.PosterURL != nil {
-		movie.PosterURL = input.PosterURL
+		setClauses = append(setClauses, fmt.Sprintf("poster_url = $%d", len(args)+1))
+		args = append(args, *input.PosterURL)
 	}
 	if input.Synopsis != nil {
-		movie.Synopsis = input.Synopsis
+		setClauses = append(setClauses, fmt.Sprintf("synopsis = $%d", len(args)+1))
+		args = append(args, *input.Synopsis)
 	}
 	if input.RuntimeMinutes != nil {
-		movie.RuntimeMinutes = input.RuntimeMinutes
+		setClauses = append(setClauses, fmt.Sprintf("runtime_minutes = $%d", len(args)+1))
+		args = append(args, *input.RuntimeMinutes)
 	}
 	if input.IMDBId != nil {
-		movie.IMDBId = input.IMDBId
+		setClauses = append(setClauses, fmt.Sprintf("imdb_id = $%d", len(args)+1))
+		args = append(args, *input.IMDBId)
 	}
 	if input.MetadataJSON != nil {
-		movie.MetadataJSON = input.MetadataJSON
+		setClauses = append(setClauses, fmt.Sprintf("metadata_json = $%d", len(args)+1))
+		args = append(args, input.MetadataJSON)
 	}
 
-	var metadataBytes []byte
-	if movie.MetadataJSON != nil {
-		metadataBytes, _ = json.Marshal(movie.MetadataJSON)
+	if len(setClauses) == 0 {
+		return r.GetByID(ctx, id)
 	}
 
-	query := `
+	query := fmt.Sprintf(`
 		UPDATE movies
-		SET title = $2, release_year = $3, poster_url = $4, synopsis = $5, runtime_minutes = $6, imdb_id = $7, metadata_json = $8
+		SET %s
 		WHERE id = $1
-		RETURNING id, created_at, updated_at, title, release_year, poster_url, synopsis, runtime_minutes, tmdb_id, imdb_id, metadata_json`
+		RETURNING id, created_at, updated_at, title, release_year, poster_url, synopsis, runtime_minutes, tmdb_id, imdb_id, metadata_json`, strings.Join(setClauses, ", "))
 
 	updated := &model.Movie{}
-	err = r.pool.QueryRow(ctx, query,
-		id,
-		movie.Title,
-		movie.ReleaseYear,
-		movie.PosterURL,
-		movie.Synopsis,
-		movie.RuntimeMinutes,
-		movie.IMDBId,
-		metadataBytes,
-	).Scan(
+	err := r.pool.QueryRow(ctx, query, args...).Scan(
 		&updated.ID,
 		&updated.CreatedAt,
 		&updated.UpdatedAt,
@@ -231,6 +224,9 @@ func (r *MovieRepository) Update(ctx context.Context, id uuid.UUID, input model.
 		&updated.MetadataJSON,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("update movie: %w", err)
 	}
 
@@ -246,4 +242,3 @@ func (r *MovieRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 	return nil
 }
-

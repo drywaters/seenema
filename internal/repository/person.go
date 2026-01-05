@@ -39,6 +39,9 @@ func (r *PersonRepository) GetAll(ctx context.Context) ([]*model.Person, error) 
 		}
 		persons = append(persons, person)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate persons: %w", err)
+	}
 
 	return persons, nil
 }
@@ -89,4 +92,3 @@ func (r *PersonRepository) GetAllAsMap(ctx context.Context) (map[string]*model.P
 
 	return personMap, nil
 }
-

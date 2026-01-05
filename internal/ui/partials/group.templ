@@ -3,17 +3,18 @@ package partials
 import (
 	"github.com/drywaters/seenema/internal/model"
 	"github.com/drywaters/seenema/internal/ui/components"
+	"github.com/drywaters/seenema/internal/ui"
 )
 
 // GroupSection renders a single group section with its entries
 templ GroupSection(groupNum int, entries []*model.Entry, persons []*model.Person) {
-	<section class="group-section mb-12" id={ "group-" + intToStr(groupNum) }>
+	<section class="group-section mb-12" id={ "group-" + ui.IntToStr(groupNum) }>
 		<div class="flex items-center justify-between mb-6">
 			<h2 class="group-title">
-				Group { intToStr(groupNum) }
+				Group { ui.IntToStr(groupNum) }
 			</h2>
 			<span class="text-cream-ticket text-sm">
-				{ intToStr(len(entries)) } { pluralize(len(entries), "movie", "movies") }
+				{ ui.IntToStr(len(entries)) } { pluralize(len(entries), "movie", "movies") }
 			</span>
 		</div>
 		
@@ -29,10 +30,21 @@ templ GroupSection(groupNum int, entries []*model.Entry, persons []*model.Person
 	</section>
 }
 
+func intToStr(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	s := ""
+	for n > 0 {
+		s = string(rune('0'+n%10)) + s
+		n /= 10
+	}
+	return s
+}
+
 func pluralize(count int, singular, plural string) string {
 	if count == 1 {
 		return singular
 	}
 	return plural
 }
-

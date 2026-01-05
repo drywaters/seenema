@@ -33,13 +33,14 @@ func run() error {
 
 	// Set up logging
 	logLevel := slog.LevelInfo
-	switch cfg.LogLevel {
-	case "debug":
-		logLevel = slog.LevelDebug
-	case "warn":
-		logLevel = slog.LevelWarn
-	case "error":
-		logLevel = slog.LevelError
+	logLevels := map[string]slog.Level{
+		"debug": slog.LevelDebug,
+		"info":  slog.LevelInfo,
+		"warn":  slog.LevelWarn,
+		"error": slog.LevelError,
+	}
+	if level, ok := logLevels[cfg.LogLevel]; ok {
+		logLevel = level
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 	slog.SetDefault(logger)
@@ -106,4 +107,3 @@ func run() error {
 	slog.Info("server stopped")
 	return nil
 }
-

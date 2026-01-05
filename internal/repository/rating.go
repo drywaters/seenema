@@ -84,6 +84,9 @@ func (r *RatingRepository) GetByEntryID(ctx context.Context, entryID uuid.UUID) 
 		rating.Person = person
 		ratings = append(ratings, rating)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ratings rows: %w", err)
+	}
 
 	return ratings, nil
 }
@@ -110,4 +113,3 @@ func (r *RatingRepository) GetAverageForEntry(ctx context.Context, entryID uuid.
 
 	return avg, nil
 }
-

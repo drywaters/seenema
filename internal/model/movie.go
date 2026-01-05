@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -60,24 +61,11 @@ func (m *Movie) FormattedRuntime() string {
 
 func formatDuration(hours, minutes int) string {
 	if minutes > 0 {
-		return intToStr(hours) + "h " + intToStr(minutes) + "m"
+		return strconv.Itoa(hours) + "h " + strconv.Itoa(minutes) + "m"
 	}
-	return intToStr(hours) + "h"
+	return strconv.Itoa(hours) + "h"
 }
 
 func formatMinutes(minutes int) string {
-	return intToStr(minutes) + "m"
+	return strconv.Itoa(minutes) + "m"
 }
-
-func intToStr(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	s := ""
-	for n > 0 {
-		s = string(rune('0'+n%10)) + s
-		n /= 10
-	}
-	return s
-}
-

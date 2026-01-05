@@ -1,6 +1,9 @@
 package partials
 
-import "github.com/drywaters/seenema/internal/tmdb"
+import (
+	"github.com/drywaters/seenema/internal/tmdb"
+	"github.com/drywaters/seenema/internal/ui"
+)
 
 // SearchResults renders TMDB search results
 templ SearchResults(results []tmdb.SearchResult) {
@@ -47,7 +50,7 @@ templ SearchResultCard(result tmdb.SearchResult) {
 		</div>
 		
 		<form hx-post="/api/tmdb/add" hx-swap="none" class="flex-shrink-0">
-			<input type="hidden" name="tmdb_id" value={ intToStr(result.ID) }/>
+			<input type="hidden" name="tmdb_id" value={ ui.IntToStr(result.ID) }/>
 			<input
 				type="hidden"
 				name="group_number"
@@ -69,21 +72,15 @@ func extractYear(releaseDate string) string {
 }
 
 func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	if maxLen <= 0 {
+		if s == "" {
+			return ""
+		}
+		return "..."
+	}
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	return s[:maxLen] + "..."
+	return string(runes[:maxLen]) + "..."
 }
-
-func intToStr(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	s := ""
-	for n > 0 {
-		s = string(rune('0'+n%10)) + s
-		n /= 10
-	}
-	return s
-}
-

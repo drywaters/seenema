@@ -57,9 +57,9 @@ func (e *Entry) RatingCount() int {
 	return len(e.Ratings)
 }
 
-// IsFullyRated returns true if all 4 family members have rated
+// IsFullyRated returns true if all family members have rated
 func (e *Entry) IsFullyRated() bool {
-	return len(e.Ratings) == 4
+	return len(e.Ratings) == len(FamilyInitials)
 }
 
 // GetRatingByPersonID returns the rating for a specific person, or nil if not rated
@@ -81,4 +81,3 @@ func (e *Entry) GetRatingByInitial(initial string) *Rating {
 	}
 	return nil
 }
-

@@ -172,10 +172,14 @@ func ReleaseYear(releaseDate string) *int {
 	if len(releaseDate) < 4 {
 		return nil
 	}
-	year := 0
 	for i := 0; i < 4; i++ {
-		year = year*10 + int(releaseDate[i]-'0')
+		if releaseDate[i] < '0' || releaseDate[i] > '9' {
+			return nil
+		}
 	}
+	year := int(releaseDate[0]-'0')*1000 +
+		int(releaseDate[1]-'0')*100 +
+		int(releaseDate[2]-'0')*10 +
+		int(releaseDate[3]-'0')
 	return &year
 }
-

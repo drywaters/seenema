@@ -6,6 +6,7 @@ import (
 	"github.com/drywaters/seenema/internal/model"
 	"github.com/drywaters/seenema/internal/ui/components"
 	"github.com/drywaters/seenema/internal/ui/layout"
+	"github.com/drywaters/seenema/internal/ui"
 	"github.com/google/uuid"
 )
 
@@ -33,7 +34,7 @@ templ MovieDetailPage(entry *model.Entry, persons []*model.Person) {
 					<div class="card mt-4 p-4 space-y-4">
 						<div class="flex items-center justify-between">
 							<span class="font-display text-gold text-sm uppercase tracking-wider">Group</span>
-							<span class="text-cream-ticket font-bold">{ intToStr(entry.GroupNumber) }</span>
+							<span class="text-cream-ticket font-bold">{ ui.IntToStr(entry.GroupNumber) }</span>
 						</div>
 						
 						<!-- Watched Status -->
@@ -60,7 +61,7 @@ templ MovieDetailPage(entry *model.Entry, persons []*model.Person) {
 						<h1 class="detail-title mb-2">{ entry.Movie.Title }</h1>
 						<div class="detail-meta flex flex-wrap items-center gap-4">
 							if entry.Movie.ReleaseYear != nil {
-								<span>{ intToStr(*entry.Movie.ReleaseYear) }</span>
+								<span>{ ui.IntToStr(*entry.Movie.ReleaseYear) }</span>
 							}
 							if entry.Movie.RuntimeMinutes != nil {
 								<span>•</span>

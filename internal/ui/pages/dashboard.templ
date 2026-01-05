@@ -2,8 +2,9 @@ package pages
 
 import (
 	"github.com/drywaters/seenema/internal/model"
-	"github.com/drywaters/seenema/internal/ui/layout"
 	"github.com/drywaters/seenema/internal/ui/components"
+	"github.com/drywaters/seenema/internal/ui/layout"
+	"github.com/drywaters/seenema/internal/ui"
 )
 
 // GroupData holds the data for a movie group
@@ -44,8 +45,8 @@ templ DashboardContent(groups []GroupData, persons []*model.Person, currentGroup
 				/>
 				<select name="group_number" id="add-group-select" class="input-field w-32">
 					for i := 1; i <= currentGroup + 1; i++ {
-						<option value={ intToStr(i) } selected?={ i == currentGroup }>
-							Group { intToStr(i) }
+						<option value={ ui.IntToStr(i) } selected?={ i == currentGroup }>
+							Group { ui.IntToStr(i) }
 						</option>
 					}
 				</select>
@@ -72,13 +73,13 @@ templ DashboardContent(groups []GroupData, persons []*model.Person, currentGroup
 }
 
 templ GroupSection(groupNum int, entries []*model.Entry, persons []*model.Person) {
-	<section class="group-section mb-12" id={ "group-" + intToStr(groupNum) }>
+	<section class="group-section mb-12" id={ "group-" + ui.IntToStr(groupNum) }>
 		<div class="flex items-center justify-between mb-6">
 			<h2 class="group-title">
-				Group { intToStr(groupNum) }
+				Group { ui.IntToStr(groupNum) }
 			</h2>
 			<span class="text-cream-ticket text-sm">
-				{ intToStr(len(entries)) } { pluralize(len(entries), "movie", "movies") }
+				{ ui.IntToStr(len(entries)) } { pluralize(len(entries), "movie", "movies") }
 			</span>
 		</div>
 		
@@ -94,22 +95,9 @@ templ GroupSection(groupNum int, entries []*model.Entry, persons []*model.Person
 	</section>
 }
 
-func intToStr(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	s := ""
-	for n > 0 {
-		s = string(rune('0'+n%10)) + s
-		n /= 10
-	}
-	return s
-}
-
 func pluralize(count int, singular, plural string) string {
 	if count == 1 {
 		return singular
 	}
 	return plural
 }
-

@@ -38,7 +38,21 @@ CREATE TRIGGER update_movies_updated_at
 -- +goose Down
 -- +goose StatementBegin
 DROP TRIGGER IF EXISTS update_movies_updated_at ON movies;
-DROP FUNCTION IF EXISTS update_updated_at_column();
+DO $$
+DECLARE
+    func_oid oid;
+BEGIN
+    func_oid := to_regproc('update_updated_at_column()');
+    IF func_oid IS NOT NULL THEN
+        IF NOT EXISTS (
+            SELECT 1
+            FROM pg_trigger
+            WHERE tgfoid = func_oid
+              AND NOT tgisinternal
+        ) THEN
+            DROP FUNCTION update_updated_at_column();
+        END IF;
+    END IF;
+END $$;
 DROP TABLE IF EXISTS movies;
 -- +goose StatementEnd
-

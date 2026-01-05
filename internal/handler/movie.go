@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"github.com/drywaters/seenema/internal/ui/partials"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // MovieHandler handles movie-related requests
@@ -140,7 +142,12 @@ func (h *MovieHandler) AddFromTMDB(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Store metadata as JSON
-		metadataJSON, _ := json.Marshal(details)
+		metadataJSON, err := json.Marshal(details)
+		if err != nil {
+			slog.Error("failed to marshal TMDB metadata", "error", err, "tmdb_id", tmdbID)
+			http.Error(w, "Failed to save movie metadata", http.StatusInternalServerError)
+			return
+		}
 
 		// Create movie in database
 		movie, err = h.movieRepo.Create(ctx, model.CreateMovieInput{
@@ -161,18 +168,32 @@ func (h *MovieHandler) AddFromTMDB(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create entry for this movie
-	_, err = h.entryRepo.Create(ctx, model.CreateEntryInput{
+	entry, err := h.entryRepo.Create(ctx, model.CreateEntryInput{
 		MovieID:     movie.ID,
 		GroupNumber: groupNumber,
 	})
 	if err != nil {
-		slog.Error("failed to create entry", "error", err)
-		http.Error(w, "Failed to create entry", http.StatusInternalServerError)
-		return
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			entry, err = h.entryRepo.GetByMovieAndGroup(ctx, movie.ID, groupNumber)
+			if err != nil {
+				slog.Error("failed to get existing entry", "error", err)
+				http.Error(w, "Failed to retrieve entry", http.StatusInternalServerError)
+				return
+			}
+			if entry == nil {
+				slog.Error("duplicate entry reported but not found", "error", err)
+				http.Error(w, "Failed to create entry", http.StatusInternalServerError)
+				return
+			}
+		} else {
+			slog.Error("failed to create entry", "error", err)
+			http.Error(w, "Failed to create entry", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Return success with HX-Trigger to refresh the group
 	w.Header().Set("HX-Trigger", `{"showToast": {"message": "Movie added!", "type": "success"}, "refreshGroups": true}`)
 	w.WriteHeader(http.StatusOK)
 }
-
