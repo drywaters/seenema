@@ -22,18 +22,29 @@ func NewEntryRepository(pool *pgxpool.Pool) *EntryRepository {
 	return &EntryRepository{pool: pool}
 }
 
+func applyPickedByPerson(entry *model.Entry, pickedByPersonDBID *uuid.UUID, pickedByInitial, pickedByName *string) {
+	if pickedByPersonDBID != nil && pickedByInitial != nil && pickedByName != nil {
+		entry.PickedByPerson = &model.Person{
+			ID:      *pickedByPersonDBID,
+			Initial: *pickedByInitial,
+			Name:    *pickedByName,
+		}
+	}
+}
+
 // Create inserts a new entry into the database
 func (r *EntryRepository) Create(ctx context.Context, input model.CreateEntryInput) (*model.Entry, error) {
 	query := `
-		INSERT INTO entries (movie_id, group_number, notes)
-		VALUES ($1, $2, $3)
-		RETURNING id, movie_id, group_number, watched_at, added_at, notes`
+		INSERT INTO entries (movie_id, group_number, notes, picked_by_person_id)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, movie_id, group_number, watched_at, added_at, notes, picked_by_person_id`
 
 	entry := &model.Entry{}
 	err := r.pool.QueryRow(ctx, query,
 		input.MovieID,
 		input.GroupNumber,
 		input.Notes,
+		input.PickedByPersonID,
 	).Scan(
 		&entry.ID,
 		&entry.MovieID,
@@ -41,6 +52,7 @@ func (r *EntryRepository) Create(ctx context.Context, input model.CreateEntryInp
 		&entry.WatchedAt,
 		&entry.AddedAt,
 		&entry.Notes,
+		&entry.PickedByPersonID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create entry: %w", err)
@@ -52,14 +64,19 @@ func (r *EntryRepository) Create(ctx context.Context, input model.CreateEntryInp
 // GetByID retrieves an entry by its ID with movie and ratings
 func (r *EntryRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Entry, error) {
 	query := `
-		SELECT e.id, e.movie_id, e.group_number, e.watched_at, e.added_at, e.notes,
-		       m.id, m.created_at, m.updated_at, m.title, m.release_year, m.poster_url, m.synopsis, m.runtime_minutes, m.tmdb_id, m.imdb_id, m.metadata_json
+		SELECT e.id, e.movie_id, e.group_number, e.watched_at, e.added_at, e.notes, e.picked_by_person_id,
+		       m.id, m.created_at, m.updated_at, m.title, m.release_year, m.poster_url, m.synopsis, m.runtime_minutes, m.tmdb_id, m.imdb_id, m.metadata_json,
+		       p.id, p.initial, p.name
 		FROM entries e
 		JOIN movies m ON e.movie_id = m.id
+		LEFT JOIN persons p ON e.picked_by_person_id = p.id
 		WHERE e.id = $1`
 
 	entry := &model.Entry{}
 	movie := &model.Movie{}
+	var pickedByPersonDBID *uuid.UUID
+	var pickedByInitial *string
+	var pickedByName *string
 
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&entry.ID,
@@ -68,6 +85,7 @@ func (r *EntryRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Ent
 		&entry.WatchedAt,
 		&entry.AddedAt,
 		&entry.Notes,
+		&entry.PickedByPersonID,
 		&movie.ID,
 		&movie.CreatedAt,
 		&movie.UpdatedAt,
@@ -79,6 +97,9 @@ func (r *EntryRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Ent
 		&movie.TMDBId,
 		&movie.IMDBId,
 		&movie.MetadataJSON,
+		&pickedByPersonDBID,
+		&pickedByInitial,
+		&pickedByName,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -88,6 +109,7 @@ func (r *EntryRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Ent
 	}
 
 	entry.Movie = movie
+	applyPickedByPerson(entry, pickedByPersonDBID, pickedByInitial, pickedByName)
 
 	// Fetch ratings with person info
 	ratings, err := r.getRatingsForEntry(ctx, id)
@@ -102,7 +124,7 @@ func (r *EntryRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Ent
 // GetByMovieAndGroup retrieves an entry by movie ID and group number
 func (r *EntryRepository) GetByMovieAndGroup(ctx context.Context, movieID uuid.UUID, groupNumber int) (*model.Entry, error) {
 	query := `
-		SELECT id, movie_id, group_number, watched_at, added_at, notes
+		SELECT id, movie_id, group_number, watched_at, added_at, notes, picked_by_person_id
 		FROM entries
 		WHERE movie_id = $1 AND group_number = $2`
 
@@ -114,6 +136,7 @@ func (r *EntryRepository) GetByMovieAndGroup(ctx context.Context, movieID uuid.U
 		&entry.WatchedAt,
 		&entry.AddedAt,
 		&entry.Notes,
+		&entry.PickedByPersonID,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -218,10 +241,12 @@ func (r *EntryRepository) getRatingsForEntries(ctx context.Context, entryIDs []u
 // ListByGroup retrieves all entries for a specific group with movie and ratings
 func (r *EntryRepository) ListByGroup(ctx context.Context, groupNumber int) ([]*model.Entry, error) {
 	query := `
-		SELECT e.id, e.movie_id, e.group_number, e.watched_at, e.added_at, e.notes,
-		       m.id, m.created_at, m.updated_at, m.title, m.release_year, m.poster_url, m.synopsis, m.runtime_minutes, m.tmdb_id, m.imdb_id, m.metadata_json
+		SELECT e.id, e.movie_id, e.group_number, e.watched_at, e.added_at, e.notes, e.picked_by_person_id,
+		       m.id, m.created_at, m.updated_at, m.title, m.release_year, m.poster_url, m.synopsis, m.runtime_minutes, m.tmdb_id, m.imdb_id, m.metadata_json,
+		       p.id, p.initial, p.name
 		FROM entries e
 		JOIN movies m ON e.movie_id = m.id
+		LEFT JOIN persons p ON e.picked_by_person_id = p.id
 		WHERE e.group_number = $1
 		ORDER BY e.added_at DESC`
 
@@ -235,6 +260,10 @@ func (r *EntryRepository) ListByGroup(ctx context.Context, groupNumber int) ([]*
 	for rows.Next() {
 		entry := &model.Entry{}
 		movie := &model.Movie{}
+		var pickedByPersonDBID *uuid.UUID
+		var pickedByInitial *string
+		var pickedByName *string
+
 		if err := rows.Scan(
 			&entry.ID,
 			&entry.MovieID,
@@ -242,6 +271,7 @@ func (r *EntryRepository) ListByGroup(ctx context.Context, groupNumber int) ([]*
 			&entry.WatchedAt,
 			&entry.AddedAt,
 			&entry.Notes,
+			&entry.PickedByPersonID,
 			&movie.ID,
 			&movie.CreatedAt,
 			&movie.UpdatedAt,
@@ -253,10 +283,15 @@ func (r *EntryRepository) ListByGroup(ctx context.Context, groupNumber int) ([]*
 			&movie.TMDBId,
 			&movie.IMDBId,
 			&movie.MetadataJSON,
+			&pickedByPersonDBID,
+			&pickedByInitial,
+			&pickedByName,
 		); err != nil {
 			return nil, fmt.Errorf("scan entry: %w", err)
 		}
 		entry.Movie = movie
+		applyPickedByPerson(entry, pickedByPersonDBID, pickedByInitial, pickedByName)
+
 		entries = append(entries, entry)
 	}
 	if err := rows.Err(); err != nil {
@@ -322,10 +357,15 @@ func (r *EntryRepository) Update(ctx context.Context, id uuid.UUID, input model.
 	query := `
 		UPDATE entries
 		SET group_number = COALESCE($2, group_number),
-		    notes = COALESCE($3, notes)
+		    notes = COALESCE($3, notes),
+		    picked_by_person_id = CASE
+		    	WHEN $4::uuid IS NULL THEN picked_by_person_id
+		    	WHEN $4::uuid = '00000000-0000-0000-0000-000000000000'::uuid THEN NULL
+		    	ELSE $4::uuid
+		    END
 		WHERE id = $1`
 
-	_, err := r.pool.Exec(ctx, query, id, input.GroupNumber, input.Notes)
+	_, err := r.pool.Exec(ctx, query, id, input.GroupNumber, input.Notes, input.PickedByPersonID)
 	if err != nil {
 		return fmt.Errorf("update entry: %w", err)
 	}

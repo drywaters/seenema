@@ -33,3 +33,6 @@
 - Keep secrets in `local.mk` (gitignored). Required values include `DATABASE_URL`, `API_TOKEN`, and `TMDB_API_KEY`.
 - Avoid inline comments after `export` lines in `local.mk`; `make` keeps the trailing space, which can break token matching.
 - For local HTTP dev, set `SECURE_COOKIES=false`; keep it true for production HTTPS.
+
+## Database Notes
+- `entries.picked_by_person_id` uses `ON DELETE SET NULL` (see `migrations/008_set_picked_by_person_on_delete.sql`) so deleting a person clears the picker.
