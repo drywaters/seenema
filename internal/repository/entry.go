@@ -22,6 +22,16 @@ func NewEntryRepository(pool *pgxpool.Pool) *EntryRepository {
 	return &EntryRepository{pool: pool}
 }
 
+func applyPickedByPerson(entry *model.Entry, pickedByPersonDBID *uuid.UUID, pickedByInitial, pickedByName *string) {
+	if pickedByPersonDBID != nil && pickedByInitial != nil && pickedByName != nil {
+		entry.PickedByPerson = &model.Person{
+			ID:      *pickedByPersonDBID,
+			Initial: *pickedByInitial,
+			Name:    *pickedByName,
+		}
+	}
+}
+
 // Create inserts a new entry into the database
 func (r *EntryRepository) Create(ctx context.Context, input model.CreateEntryInput) (*model.Entry, error) {
 	query := `
@@ -64,7 +74,6 @@ func (r *EntryRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Ent
 
 	entry := &model.Entry{}
 	movie := &model.Movie{}
-	var pickedByPersonID *uuid.UUID
 	var pickedByPersonDBID *uuid.UUID
 	var pickedByInitial *string
 	var pickedByName *string
@@ -76,7 +85,7 @@ func (r *EntryRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Ent
 		&entry.WatchedAt,
 		&entry.AddedAt,
 		&entry.Notes,
-		&pickedByPersonID,
+		&entry.PickedByPersonID,
 		&movie.ID,
 		&movie.CreatedAt,
 		&movie.UpdatedAt,
@@ -100,15 +109,7 @@ func (r *EntryRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Ent
 	}
 
 	entry.Movie = movie
-	entry.PickedByPersonID = pickedByPersonID
-
-	if pickedByPersonDBID != nil && pickedByInitial != nil && pickedByName != nil {
-		entry.PickedByPerson = &model.Person{
-			ID:      *pickedByPersonDBID,
-			Initial: *pickedByInitial,
-			Name:    *pickedByName,
-		}
-	}
+	applyPickedByPerson(entry, pickedByPersonDBID, pickedByInitial, pickedByName)
 
 	// Fetch ratings with person info
 	ratings, err := r.getRatingsForEntry(ctx, id)
@@ -259,7 +260,6 @@ func (r *EntryRepository) ListByGroup(ctx context.Context, groupNumber int) ([]*
 	for rows.Next() {
 		entry := &model.Entry{}
 		movie := &model.Movie{}
-		var pickedByPersonID *uuid.UUID
 		var pickedByPersonDBID *uuid.UUID
 		var pickedByInitial *string
 		var pickedByName *string
@@ -271,7 +271,7 @@ func (r *EntryRepository) ListByGroup(ctx context.Context, groupNumber int) ([]*
 			&entry.WatchedAt,
 			&entry.AddedAt,
 			&entry.Notes,
-			&pickedByPersonID,
+			&entry.PickedByPersonID,
 			&movie.ID,
 			&movie.CreatedAt,
 			&movie.UpdatedAt,
@@ -290,15 +290,7 @@ func (r *EntryRepository) ListByGroup(ctx context.Context, groupNumber int) ([]*
 			return nil, fmt.Errorf("scan entry: %w", err)
 		}
 		entry.Movie = movie
-		entry.PickedByPersonID = pickedByPersonID
-
-		if pickedByPersonDBID != nil && pickedByInitial != nil && pickedByName != nil {
-			entry.PickedByPerson = &model.Person{
-				ID:      *pickedByPersonDBID,
-				Initial: *pickedByInitial,
-				Name:    *pickedByName,
-			}
-		}
+		applyPickedByPerson(entry, pickedByPersonDBID, pickedByInitial, pickedByName)
 
 		entries = append(entries, entry)
 	}

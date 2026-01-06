@@ -56,19 +56,19 @@ func (h *EntryHandler) Update(w http.ResponseWriter, r *http.Request) {
 		input.Notes = &notes
 	}
 
-	if pickedByValues, ok := r.Form["picked_by_person_id"]; ok {
-		pickedByStr := ""
-		if len(pickedByValues) > 0 {
-			pickedByStr = pickedByValues[0]
-		}
+	if _, ok := r.Form["picked_by_person_id"]; ok {
+		pickedByStr := r.FormValue("picked_by_person_id")
 		if pickedByStr == "" {
 			nilID := uuid.Nil
 			input.PickedByPersonID = &nilID
 		} else {
 			pickedByID, err := uuid.Parse(pickedByStr)
-			if err == nil {
-				input.PickedByPersonID = &pickedByID
+			if err != nil {
+				slog.Warn("invalid picked_by_person_id", "error", err, "picked_by_person_id", pickedByStr, "entry_id", entryID)
+				http.Error(w, "Invalid picked_by_person_id", http.StatusBadRequest)
+				return
 			}
+			input.PickedByPersonID = &pickedByID
 		}
 	}
 
