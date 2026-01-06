@@ -366,7 +366,11 @@ func (r *EntryRepository) Update(ctx context.Context, id uuid.UUID, input model.
 		UPDATE entries
 		SET group_number = COALESCE($2, group_number),
 		    notes = COALESCE($3, notes),
-		    picked_by_person_id = COALESCE($4, picked_by_person_id)
+		    picked_by_person_id = CASE
+		    	WHEN $4::uuid IS NULL THEN picked_by_person_id
+		    	WHEN $4::uuid = '00000000-0000-0000-0000-000000000000'::uuid THEN NULL
+		    	ELSE $4::uuid
+		    END
 		WHERE id = $1`
 
 	_, err := r.pool.Exec(ctx, query, id, input.GroupNumber, input.Notes, input.PickedByPersonID)
