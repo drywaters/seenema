@@ -258,3 +258,4 @@ func (h *EntryHandler) Reorder(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("HX-Trigger", `{"showToast": {"message": "Order updated!", "type": "success"}}`)
 	w.WriteHeader(http.StatusOK)
 }
+

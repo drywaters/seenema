@@ -86,3 +86,4 @@ func (e *Entry) GetRatingByInitial(initial string) *Rating {
 	}
 	return nil
 }
+

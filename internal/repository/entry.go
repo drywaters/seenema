@@ -296,7 +296,6 @@ func (r *EntryRepository) ListByGroup(ctx context.Context, groupNumber int) ([]*
 		}
 		entry.Movie = movie
 		applyPickedByPerson(entry, pickedByPersonDBID, pickedByInitial, pickedByName)
-
 		entries = append(entries, entry)
 	}
 	if err := rows.Err(); err != nil {
