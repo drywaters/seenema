@@ -7,13 +7,16 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
+	"github.com/drywaters/seenema/internal/assets"
 	"github.com/drywaters/seenema/internal/config"
 	"github.com/drywaters/seenema/internal/repository"
 	"github.com/drywaters/seenema/internal/server"
 	"github.com/drywaters/seenema/internal/tmdb"
+	"github.com/drywaters/seenema/internal/ui/layout"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -71,6 +74,17 @@ func run() error {
 	tmdbClient := tmdb.NewClient(cfg.TMDBAPIKey)
 	slog.Info("TMDB client initialized")
 
+	assetsVersion, err := assets.Version(
+		filepath.Join("static", "styles.css"),
+		filepath.Join("static", "dragdrop.js"),
+		filepath.Join("static", "htmx.min.js"),
+	)
+	if err != nil {
+		slog.Warn("asset version unavailable", "error", err)
+	} else {
+		layout.SetAssetsVersion(assetsVersion)
+	}
+
 	// Create server
 	srv := server.New(cfg, movieRepo, entryRepo, personRepo, ratingRepo, tmdbClient)
 
@@ -107,4 +121,3 @@ func run() error {
 	slog.Info("server stopped")
 	return nil
 }
-
