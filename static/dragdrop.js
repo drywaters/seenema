@@ -12,58 +12,75 @@
         if (!groupNum) return;
 
         let draggedItem = null;
-        let placeholder = null;
 
         grid.querySelectorAll('.draggable-item').forEach(item => {
+            if (item.dataset.dndBound === 'true') {
+                return;
+            }
+            item.dataset.dndBound = 'true';
+
             item.setAttribute('draggable', 'true');
 
-            item.addEventListener('dragstart', function(e) {
-                draggedItem = this;
-                this.classList.add('dragging');
+            const handle = item.querySelector('.drag-handle');
+            if (handle) {
+                handle.setAttribute('draggable', 'true');
+            }
+
+            item.querySelectorAll('a, img').forEach(el => {
+                el.setAttribute('draggable', 'false');
+            });
+        });
+
+        if (grid.dataset.dndGridBound === 'true') {
+            return;
+        }
+        grid.dataset.dndGridBound = 'true';
+
+        grid.addEventListener('dragstart', function(e) {
+            const targetItem = e.target.closest('.draggable-item');
+            if (!targetItem || !grid.contains(targetItem)) return;
+
+            draggedItem = targetItem;
+            draggedItem.classList.add('dragging');
+
+            if (e.dataTransfer) {
                 e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', this.dataset.entryId);
-
-                // Create placeholder
-                placeholder = document.createElement('div');
-                placeholder.className = 'drag-placeholder';
-                placeholder.style.height = this.offsetHeight + 'px';
-            });
-
-            item.addEventListener('dragend', function(e) {
-                this.classList.remove('dragging');
-                if (placeholder && placeholder.parentNode) {
-                    placeholder.parentNode.removeChild(placeholder);
+                e.dataTransfer.setData('text/plain', targetItem.dataset.entryId || '');
+                if (e.target.classList && e.target.classList.contains('drag-handle')) {
+                    e.dataTransfer.setDragImage(targetItem, 20, 20);
                 }
-                placeholder = null;
-                draggedItem = null;
+            }
+        });
 
-                // Save the new order
-                saveOrder(grid, groupNum);
-            });
+        grid.addEventListener('dragend', function(e) {
+            if (!draggedItem) return;
 
-            item.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
+            draggedItem.classList.remove('dragging');
+            draggedItem = null;
 
-                if (!draggedItem || this === draggedItem) return;
+            // Save the new order
+            saveOrder(grid, groupNum);
+        });
 
-                const rect = this.getBoundingClientRect();
-                const midX = rect.left + rect.width / 2;
-                const midY = rect.top + rect.height / 2;
+        grid.addEventListener('dragover', function(e) {
+            if (!draggedItem) return;
 
-                // Determine if we should insert before or after
-                const afterElement = (e.clientX > midX || e.clientY > midY);
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
 
-                if (afterElement) {
-                    this.parentNode.insertBefore(draggedItem, this.nextSibling);
-                } else {
-                    this.parentNode.insertBefore(draggedItem, this);
-                }
-            });
+            const overItem = e.target.closest('.draggable-item');
+            if (!overItem || overItem === draggedItem) return;
 
-            item.addEventListener('drop', function(e) {
-                e.preventDefault();
-            });
+            const rect = overItem.getBoundingClientRect();
+            const midX = rect.left + rect.width / 2;
+            const midY = rect.top + rect.height / 2;
+            const afterElement = (e.clientX > midX || e.clientY > midY);
+
+            if (afterElement) {
+                overItem.parentNode.insertBefore(draggedItem, overItem.nextSibling);
+            } else {
+                overItem.parentNode.insertBefore(draggedItem, overItem);
+            }
         });
 
         // Handle drop on the grid itself
@@ -111,6 +128,5 @@
     document.addEventListener('DOMContentLoaded', initDragDrop);
 
     // Reinitialize after HTMX content swaps
-    document.body.addEventListener('htmx:afterSwap', initDragDrop);
     document.body.addEventListener('htmx:afterSettle', initDragDrop);
 })();

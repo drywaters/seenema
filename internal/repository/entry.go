@@ -34,6 +34,19 @@ func applyPickedByPerson(entry *model.Entry, pickedByPersonDBID *uuid.UUID, pick
 
 // Create inserts a new entry into the database
 func (r *EntryRepository) Create(ctx context.Context, input model.CreateEntryInput) (*model.Entry, error) {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("create entry begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	// Serialize position assignment per group to avoid duplicate positions under concurrency.
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(1, $1)", input.GroupNumber); err != nil {
+		return nil, fmt.Errorf("create entry lock group: %w", err)
+	}
+
 	// Insert with position = max position in group + 1 (or 1 if no entries in group)
 	query := `
 		INSERT INTO entries (movie_id, group_number, notes, picked_by_person_id, position)
@@ -41,7 +54,7 @@ func (r *EntryRepository) Create(ctx context.Context, input model.CreateEntryInp
 		RETURNING id, movie_id, group_number, position, watched_at, added_at, notes, picked_by_person_id`
 
 	entry := &model.Entry{}
-	err := r.pool.QueryRow(ctx, query,
+	err = tx.QueryRow(ctx, query,
 		input.MovieID,
 		input.GroupNumber,
 		input.Notes,
@@ -58,6 +71,10 @@ func (r *EntryRepository) Create(ctx context.Context, input model.CreateEntryInp
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create entry: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("create entry commit: %w", err)
 	}
 
 	return entry, nil
@@ -413,25 +430,57 @@ func (r *EntryRepository) ReorderEntries(ctx context.Context, groupNumber int, e
 		return nil
 	}
 
-	// Use a transaction to ensure atomicity
-	tx, err := r.pool.Begin(ctx)
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
+		return fmt.Errorf("reorder entries begin tx: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
-	// Update each entry's position
-	query := `UPDATE entries SET position = $1 WHERE id = $2 AND group_number = $3`
-	for i, entryID := range entryIDs {
-		position := i + 1 // Positions start at 1
-		_, err := tx.Exec(ctx, query, position, entryID, groupNumber)
-		if err != nil {
-			return fmt.Errorf("update entry position: %w", err)
-		}
+	// Serialize reorders per group to avoid conflicting position updates.
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(1, $1)", groupNumber); err != nil {
+		return fmt.Errorf("reorder entries lock group: %w", err)
+	}
+
+	var groupCount int
+	if err := tx.QueryRow(ctx, "SELECT COUNT(*) FROM entries WHERE group_number = $1", groupNumber).Scan(&groupCount); err != nil {
+		return fmt.Errorf("reorder entries count group: %w", err)
+	}
+	if groupCount != len(entryIDs) {
+		return fmt.Errorf("reorder entries count mismatch: group has %d entries, request has %d", groupCount, len(entryIDs))
+	}
+
+	positions := make([]int, len(entryIDs))
+	for i := range entryIDs {
+		positions[i] = i + 1
+	}
+
+	// Move current positions out of the way to avoid unique constraint conflicts.
+	if _, err := tx.Exec(ctx, `
+		UPDATE entries
+		SET position = -position
+		WHERE group_number = $1 AND id = ANY($2::uuid[])`,
+		groupNumber,
+		entryIDs,
+	); err != nil {
+		return fmt.Errorf("reorder entries temp positions: %w", err)
+	}
+
+	query := `
+		UPDATE entries AS e
+		SET position = v.position
+		FROM (
+			SELECT unnest($1::uuid[]) AS id, unnest($2::int[]) AS position
+		) AS v
+		WHERE e.id = v.id AND e.group_number = $3`
+	_, err = tx.Exec(ctx, query, entryIDs, positions, groupNumber)
+	if err != nil {
+		return fmt.Errorf("update entry positions: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit transaction: %w", err)
+		return fmt.Errorf("reorder entries commit: %w", err)
 	}
 
 	return nil

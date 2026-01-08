@@ -496,6 +496,10 @@
 		transform: scale(0.98);
 	}
 
+	.draggable-item.dragging .drag-handle {
+		opacity: 1;
+	}
+
 	.drag-handle {
 		position: absolute;
 		top: 0.5rem;

@@ -243,7 +243,8 @@ func (h *EntryHandler) Reorder(w http.ResponseWriter, r *http.Request) {
 	for _, idStr := range req.EntryIDs {
 		id, err := uuid.Parse(idStr)
 		if err != nil {
-			http.Error(w, "Invalid entry ID: "+idStr, http.StatusBadRequest)
+			slog.Warn("invalid entry id in reorder request", "entry_id", idStr, "error", err)
+			http.Error(w, "Invalid entry ID", http.StatusBadRequest)
 			return
 		}
 		entryIDs = append(entryIDs, id)
@@ -255,7 +256,5 @@ func (h *EntryHandler) Reorder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("HX-Trigger", `{"showToast": {"message": "Order updated!", "type": "success"}}`)
 	w.WriteHeader(http.StatusOK)
 }
-
