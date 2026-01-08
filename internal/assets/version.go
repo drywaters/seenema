@@ -23,13 +23,16 @@ func Version(paths ...string) (string, error) {
 			return "", fmt.Errorf("open %s: %w", path, err)
 		}
 
-		if _, err := io.Copy(hasher, file); err != nil {
-			_ = file.Close()
-			return "", fmt.Errorf("read %s: %w", path, err)
+		copyErr := func() error {
+			_, err := io.Copy(hasher, file)
+			return err
+		}()
+		closeErr := file.Close()
+		if copyErr != nil {
+			return "", fmt.Errorf("read %s: %w", path, copyErr)
 		}
-
-		if err := file.Close(); err != nil {
-			return "", fmt.Errorf("close %s: %w", path, err)
+		if closeErr != nil {
+			return "", fmt.Errorf("close %s: %w", path, closeErr)
 		}
 	}
 
