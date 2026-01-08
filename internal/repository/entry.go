@@ -444,11 +444,11 @@ func (r *EntryRepository) ReorderEntries(ctx context.Context, groupNumber int, e
 	}
 
 	var groupCount int
-	if err := tx.QueryRow(ctx, "SELECT COUNT(*) FROM entries WHERE group_number = $1", groupNumber).Scan(&groupCount); err != nil {
+	if err := tx.QueryRow(ctx, "SELECT COUNT(*) FROM entries WHERE group_number = $1 AND id = ANY($2::uuid[])", groupNumber, entryIDs).Scan(&groupCount); err != nil {
 		return fmt.Errorf("reorder entries count group: %w", err)
 	}
 	if groupCount != len(entryIDs) {
-		return fmt.Errorf("reorder entries count mismatch: group has %d entries, request has %d", groupCount, len(entryIDs))
+		return fmt.Errorf("reorder entries count mismatch: group has %d matching entries, request has %d", groupCount, len(entryIDs))
 	}
 
 	positions := make([]int, len(entryIDs))
